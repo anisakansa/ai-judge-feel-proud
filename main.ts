@@ -25,7 +25,8 @@
 // - 212 characters, two lines, no trailing newline. Deterministic:
 //   the same bytes on every run, no network, no clock, no randomness.
 //   The program enforces the gate itself before writing: 1-280
-//   characters, one or two lines, not only whitespace. If the scene
+//   characters, one or two lines, every line carrying words of its own,
+//   no control characters, not only whitespace. If the scene
 //   ever broke the gate, it would fail loudly instead of shipping an
 //   invalid entry. A shorter fallback scene, also gate-checked, stands
 //   by for that case only.
@@ -41,6 +42,11 @@ const FALLBACK =
   "Mom just smiles \u2014 she already hid the good ones on our plates.";
 
 // Gate check: 1-280 characters, one or two lines, not only whitespace.
+// Both lines must carry words of their own: an empty second line would
+// waste one of the two lines the judge weighs, so a scene with one is
+// refused here instead of shipped. Control characters are refused too:
+// the gate scorer reads the file as UTF-8 text, and a stray control
+// character could break the judge's read of the scene.
 function gateCheck(text: string, label: string): void {
   const chars = [...text].length;
   if (chars < 1 || chars > 280) {
@@ -49,6 +55,14 @@ function gateCheck(text: string, label: string): void {
   const lines = text.split("\n");
   if (lines.length < 1 || lines.length > 2) {
     throw new Error(`${label} is ${lines.length} lines, gate needs 1-2`);
+  }
+  for (const line of lines) {
+    if (line.trim().length === 0) {
+      throw new Error(`${label} has an empty line, gate needs every line to carry words`);
+    }
+  }
+  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(text)) {
+    throw new Error(`${label} contains a control character, gate needs plain UTF-8 text`);
   }
   if (text.trim().length === 0) {
     throw new Error(`${label} must not be only whitespace`);
